@@ -1,58 +1,80 @@
-// src/App.jsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import ProductsPage from './pages/ProductsPage';
-import NotFoundPage from './pages/NotFoundPage.jsx'; // Ensure .jsx if you renamed it
-import LoginPage from './pages/LoginPage.jsx';     // Import LoginPage
-import RegisterPage from './pages/RegisterPage.jsx'; // Import RegisterPage
-import { AuthProvider, useAuth } from './contexts/AuthContext.jsx'; // Import useAuth
+import NotFoundPage from './pages/NotFoundPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 
-// Component for the navigation bar
+import { Button } from './components/ui/button';
+import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem } from './components/ui/menubar';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './components/ui/dropdown-menu';
+
 function Navbar() {
-  const { isAuthenticated, logout, user } = useAuth(); // Get auth state and logout function
+  const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout(); // Clear auth state
-    navigate('/login'); // Redirect to login page after logout
+    logout();
+    navigate('/login');
   };
 
   return (
-    <nav className="bg-gray-800 p-4 text-white">
-      <ul className="flex justify-center space-x-6">
-        <li>
-          <Link to="/" className="hover:text-gray-300">Home</Link>
-        </li>
-        <li>
-          <Link to="/products" className="hover:text-gray-300">Products</Link>
-        </li>
-        {isAuthenticated && ( // Only show cart if authenticated
-          <li>
-            <Link to="/cart" className="hover:text-gray-300">Cart (Placeholder)</Link>
-          </li>
+    <Menubar className="flex justify-between items-center px-4 py-2 shadow-md">
+      <MenubarMenu>
+        <Link to="/" className="text-lg font-bold">ePay</Link>
+      </MenubarMenu>
+
+      <div className="flex items-center space-x-4">
+        <MenubarMenu>
+          <MenubarTrigger asChild>
+            <Link to="/">Home</Link>
+          </MenubarTrigger>
+        </MenubarMenu>
+        <MenubarMenu>
+          <MenubarTrigger asChild>
+            <Link to="/products">Products</Link>
+          </MenubarTrigger>
+        </MenubarMenu>
+
+        {isAuthenticated && (
+          <MenubarMenu>
+            <MenubarTrigger asChild>
+              <Link to="/cart">Cart (Placeholder)</Link>
+            </MenubarTrigger>
+          </MenubarMenu>
         )}
+
         {isAuthenticated ? (
-          <>
-            <li className="text-gray-400">Hello, {user?.username || 'User'}!</li> {/* Display username */}
-            <li>
-              <button onClick={handleLogout} className="hover:text-gray-300 bg-transparent border-none cursor-pointer text-white">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <span>Hello, {user?.username || 'User'}!</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuItem onClick={handleLogout}>
                 Logout
-              </button>
-            </li>
-          </>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <>
-            <li>
-              <Link to="/login" className="hover:text-gray-300">Login</Link>
-            </li>
-            <li>
-              <Link to="/register" className="hover:text-gray-300">Register</Link>
-            </li>
+            <MenubarMenu>
+              <MenubarTrigger asChild>
+                <Link to="/login">Login</Link>
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger asChild>
+                <Link to="/register">Register</Link>
+              </MenubarTrigger>
+            </MenubarMenu>
           </>
         )}
-      </ul>
-    </nav>
+      </div>
+    </Menubar>
   );
 }
 
@@ -60,14 +82,12 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <Navbar /> {/* Render the Navbar component */}
-        {/* Main Content Area - Routes will render here */}
+        <Navbar />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/products" element={<ProductsPage />} />
-          <Route path="/login" element={<LoginPage />} />       {/* Add Login Route */}
-          <Route path="/register" element={<RegisterPage />} /> {/* Add Register Route */}
-          {/* Add more routes here as we build out features */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Router>
