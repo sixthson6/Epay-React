@@ -1,82 +1,217 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect } from 'react'
+import authService from '../services/authService'
 
-const AuthContext = createContext(null);
+// Initial state
+const initialState = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  error: null
+}
 
-export const AuthProvider = ({ children }) => {
-  // Initialize state from localStorage if a token exists
-  const [token, setToken] = useState(localStorage.getItem('accessToken'));
-  const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refreshToken'));
-  const [user, setUser] = useState(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      return storedUser ? JSON.parse(storedUser) : null;
-    } catch (error) {
-      console.error("Failed to parse user from localStorage", error);
-      return null;
-    }
-  });
+// Action types
+const AUTH_ACTIONS = {
+  LOGIN_START: 'LOGIN_START',
+  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  LOGIN_FAILURE: 'LOGIN_FAILURE',
+  LOGOUT: 'LOGOUT',
+  REGISTER_START: 'REGISTER_START',
+  REGISTER_SUCCESS: 'REGISTER_SUCCESS',
+  REGISTER_FAILURE: 'REGISTER_FAILURE',
+  LOAD_USER: 'LOAD_USER',
+  CLEAR_ERROR: 'CLEAR_ERROR',
+  SET_LOADING: 'SET_LOADING'
+}
 
-  // Update localStorage whenever token, refreshToken, or user changes
+// Reducer function
+function authReducer(state, action) {
+  switch (action.type) {
+    case AUTH_ACTIONS.LOGIN_START:
+    case AUTH_ACTIONS.REGISTER_START:
+      return {
+        ...state,
+        isLoading: true,
+        error: null
+      }
+
+    case AUTH_ACTIONS.LOGIN_SUCCESS:
+      return {
+        ...state,
+        user: action.payload.user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null
+      }
+
+    case AUTH_ACTIONS.REGISTER_SUCCESS:
+      return {
+        ...state,
+        isLoading: false,
+        error: null
+      }
+
+    case AUTH_ACTIONS.LOGIN_FAILURE:
+    case AUTH_ACTIONS.REGISTER_FAILURE:
+      return {
+        ...state,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: action.payload.error
+      }
+
+    case AUTH_ACTIONS.LOGOUT:
+      return {
+        ...state,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null
+      }
+
+    case AUTH_ACTIONS.LOAD_USER:
+      return {
+        ...state,
+        user: action.payload.user,
+        isAuthenticated: !!action.payload.user,
+        isLoading: false
+      }
+
+    case AUTH_ACTIONS.CLEAR_ERROR:
+      return {
+        ...state,
+        error: null
+      }
+
+    case AUTH_ACTIONS.SET_LOADING:
+      return {
+        ...state,
+        isLoading: action.payload.isLoading
+      }
+
+    default:
+      return state
+  }
+}
+
+// Create context
+const AuthContext = createContext()
+
+// Auth provider component
+export function AuthProvider({ children }) {
+  const [state, dispatch] = useReducer(authReducer, initialState)
+
+  // Initialize authentication on app start
   useEffect(() => {
-    if (token) {
-      localStorage.setItem('accessToken', token);
-    } else {
-      localStorage.removeItem('accessToken');
+    initializeAuth()
+  }, [])
+
+  const initializeAuth = () => {
+    try {
+      authService.initializeAuth()
+      const user = authService.getCurrentUser()
+      
+      dispatch({
+        type: AUTH_ACTIONS.LOAD_USER,
+        payload: { user }
+      })
+    } catch (error) {
+      console.error('Failed to initialize auth:', error)
+      dispatch({
+        type: AUTH_ACTIONS.LOAD_USER,
+        payload: { user: null }
+      })
     }
-    if (refreshToken) {
-      localStorage.setItem('refreshToken', refreshToken);
-    } else {
-      localStorage.removeItem('refreshToken');
+  }
+
+  const login = async (credentials) => {
+    dispatch({ type: AUTH_ACTIONS.LOGIN_START })
+
+    try {
+      const response = await authService.login(credentials)
+      const user = {
+        id: response.userId,
+        username: response.username,
+        roles: response.roles
+      }
+
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: { user }
+      })
+
+      return response
+    } catch (error) {
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_FAILURE,
+        payload: { error: error.message }
+      })
+      throw error
     }
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('user');
+  }
+
+  const register = async (userData) => {
+    dispatch({ type: AUTH_ACTIONS.REGISTER_START })
+
+    try {
+      const response = await authService.register(userData)
+      
+      dispatch({
+        type: AUTH_ACTIONS.REGISTER_SUCCESS
+      })
+
+      return response
+    } catch (error) {
+      dispatch({
+        type: AUTH_ACTIONS.REGISTER_FAILURE,
+        payload: { error: error.message }
+      })
+      throw error
     }
-  }, [token, refreshToken, user]);
+  }
 
-  const login = useCallback((accessToken, newRefreshToken, userData) => {
-    setToken(accessToken);
-    setRefreshToken(newRefreshToken);
-    setUser(userData);
-  }, []);
+  const logout = () => {
+    authService.logout()
+    dispatch({ type: AUTH_ACTIONS.LOGOUT })
+  }
 
-  const logout = useCallback(() => {
-    setToken(null);
-    setRefreshToken(null);
-    setUser(null);
-    localStorage.clear(); // Clear all auth-related items
-  }, []);
+  const clearError = () => {
+    dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR })
+  }
 
-  // Helper to check if user has a specific role
-  const hasRole = useCallback((roleName) => {
-    return user?.roles?.includes(roleName);
-  }, [user]);
+  const hasRole = (role) => {
+    return authService.hasRole(role)
+  }
 
-  const authContextValue = {
-    token,
-    refreshToken,
-    user,
-    isAuthenticated: !!token, // Convenience boolean
+  const isAdmin = () => {
+    return hasRole('ROLE_ADMIN')
+  }
+
+  const value = {
+    ...state,
     login,
+    register,
     logout,
+    clearError,
     hasRole,
-    // Potentially add a function to update only the access token if refresh token flow is silent
-    setAccessToken: setToken,
-  };
+    isAdmin
+  }
 
   return (
-    <AuthContext.Provider value={authContextValue}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
-  );
-};
+  )
+}
 
-// Custom hook to easily use auth context in any component
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+// Custom hook to use auth context
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
   }
-  return context;
-};
+  return context
+}
+
+export default AuthContext
+
