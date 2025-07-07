@@ -1,9 +1,7 @@
-// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx'; // Make sure to use .jsx
 import { login } from '../services/authService'; // Import login function
-import api from '../services/apiService'; // Import api for potential refresh in context
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,15 +17,7 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      // Call the login function from authService
-      const responseData = await login({ email, password });
-
-      // CRITICAL: Ensure your backend's /auth/login returns the full JwtAuthResponse object.
-      // As per your spec, it should be { accessToken, refreshToken, tokenType, userId, username, roles }
-      const { accessToken, refreshToken, expiresIn } = responseData;
-
-      // Update AuthContext state and localStorage
-      authLogin(accessToken, refreshToken, { expiresIn });
+      await authLogin({ email, password });
 
       // Redirect to the home page or a dashboard
       navigate('/');

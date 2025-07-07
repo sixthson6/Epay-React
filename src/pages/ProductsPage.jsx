@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getProducts } from '../services/apiService'; 
+import { productService } from '../services/productService';
+
 function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -8,8 +9,8 @@ function ProductsPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const data = await getProducts();
-        setProducts(data);
+        const data = await productService.getAllProducts();
+        setProducts(data.content); // Assuming the products are in the 'content' property
       } catch (err) {
         setError('Failed to load products. Please check your backend connection.');
         console.error('API call error:', err);
